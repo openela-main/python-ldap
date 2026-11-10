@@ -1,0 +1,423 @@
+From 1d9ff22702857d85a91ab55259177f09af01f38c Mon Sep 17 00:00:00 2001
+From: Simon Pichugin <spichugi@redhat.com>
+Date: Thu, 11 Jun 2026 16:09:48 -0700
+Subject: [PATCH] Revert "Package python-ldap with pyproject.toml (#589)"
+
+This reverts commit f49bb2dd2234f25404ad1679786de007444ce219.
+---
+ .coveragerc               |  27 ++++++++++
+ .gitignore                |   2 +
+ Doc/installing.rst        |  30 +++--------
+ Doc/spelling_wordlist.txt |   4 --
+ INSTALL                   |   3 +-
+ MANIFEST.in               |   2 +-
+ Makefile                  |   1 +
+ pyproject.toml            | 111 +++-----------------------------------
+ setup.py                  |  77 ++++++++++++++++++++++++--
+ tox.ini                   |   1 -
+ 10 files changed, 120 insertions(+), 138 deletions(-)
+ create mode 100644 .coveragerc
+
+diff --git a/.coveragerc b/.coveragerc
+new file mode 100644
+index 0000000..738d86f
+--- /dev/null
++++ b/.coveragerc
+@@ -0,0 +1,27 @@
++[run]
++branch = True
++source =
++   ldap
++   ldif
++   ldapurl
++   slapdtest
++
++[paths]
++source =
++    Lib/
++    .tox/*/lib/python*/site-packages/
++
++[report]
++ignore_errors = False
++precision = 1
++exclude_lines =
++    pragma: no cover
++    raise NotImplementedError
++    if 0:
++    if __name__ == .__main__.:
++    if PY2
++    if not PY2
++
++[html]
++directory = build/htmlcov
++title = python-ldap coverage report
+diff --git a/.gitignore b/.gitignore
+index 75a1353..bab2187 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -3,6 +3,8 @@
+ *.pyc
+ __pycache__/
+ .tox
++.coverage*
++!.coveragerc
+ /.cache
+ /.pytest_cache
+ 
+diff --git a/Doc/installing.rst b/Doc/installing.rst
+index 1c7ec8c..03e7a29 100644
+--- a/Doc/installing.rst
++++ b/Doc/installing.rst
+@@ -76,23 +76,12 @@ The CVS repository of FreeBSD contains the package
+ macOS
+ -----
+ 
+-You can install directly with pip. First install Xcode command line tools::
++You can install directly with pip::
+ 
+     $ xcode-select --install
+-
+-Then install python-ldap::
+-
+-    $ pip install python-ldap
+-
+-For custom installations, you may need to set environment variables::
+-
+-    $ export CPPFLAGS="-I$(xcrun --show-sdk-path)/usr/include/sasl"
+-    $ pip install python-ldap
+-
+-If using Homebrew::
+-
+-    $ brew install openldap
+-    $ pip install python-ldap
++    $ pip install python-ldap \
++        --global-option=build_ext \
++        --global-option="-I$(xcrun --show-sdk-path)/usr/include/sasl"
+ 
+ 
+ .. _install-source:
+@@ -101,14 +90,11 @@ Installing from Source
+ ======================
+ 
+ 
+-python-ldap is built and installed using modern Python packaging standards
+-with pyproject.toml configuration. From a source repository::
+-
+-    $ pip install .
+-
+-For development installation with editable mode::
++python-ldap is built and installed using the Python setuptools.
++From a source repository::
+ 
+-    $ pip install -e .
++    $ python -m pip install setuptools
++    $ python setup.py install
+ 
+ If you have more than one Python interpreter installed locally, you should
+ use the same one you plan to use python-ldap with.
+diff --git a/Doc/spelling_wordlist.txt b/Doc/spelling_wordlist.txt
+index 42a8540..8cdd9f1 100644
+--- a/Doc/spelling_wordlist.txt
++++ b/Doc/spelling_wordlist.txt
+@@ -60,7 +60,6 @@ func
+ Gohlke
+ GPG
+ Heimdal
+-Homebrew
+ hostport
+ hrefTarget
+ hrefText
+@@ -108,7 +107,6 @@ previousDN
+ processResultsCount
+ Proxied
+ py
+-pyproject
+ pytest
+ rdn
+ readthedocs
+@@ -149,7 +147,6 @@ syncrepl
+ syntaxes
+ timelimit
+ TLS
+-toml
+ tracebacks
+ tuple
+ tuples
+@@ -166,6 +163,5 @@ userPassword
+ usr
+ uuids
+ Valgrind
+-Xcode
+ whitespace
+ workflow
+diff --git a/INSTALL b/INSTALL
+index 224df4a..b9b13d2 100644
+--- a/INSTALL
++++ b/INSTALL
+@@ -1,7 +1,8 @@
+ Quick build instructions:
+ 
+     edit setup.cfg (see Build/ for platform-specific examples)
+-    pip install .
++    python setup.py build
++    python setup.py install
+ 
+ Detailed instructions are in Doc/installing.rst, or online at:
+ 
+diff --git a/MANIFEST.in b/MANIFEST.in
+index bedea8d..687d2b0 100644
+--- a/MANIFEST.in
++++ b/MANIFEST.in
+@@ -1,5 +1,5 @@
+ include MANIFEST.in Makefile CHANGES INSTALL LICENCE README TODO
+-include tox.ini
++include tox.ini .coveragerc
+ include Modules/*.c Modules/*.h
+ recursive-include Build *.cfg*
+ recursive-include Lib *.py
+diff --git a/Makefile b/Makefile
+index 2c8efdb..577ba88 100644
+--- a/Makefile
++++ b/Makefile
+@@ -20,6 +20,7 @@ Modules/constants_generated.h: Lib/ldap/constants.py
+ .PHONY: clean
+ clean:
+ 	rm -rf build dist *.egg-info .tox MANIFEST
++	rm -f .coverage .coverage.*
+ 	find . \( -name '*.py[co]' -or -name '*.so*' -or -name '*.dylib' \) \
+ 	    -delete
+ 	find . -depth -name __pycache__ -exec rm -rf {} \;
+diff --git a/pyproject.toml b/pyproject.toml
+index 77783f8..dda8dbc 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -1,107 +1,8 @@
+-[build-system]
+-requires = [
+-    "setuptools",
+-]
+-build-backend = "setuptools.build_meta"
+-
+-[project]
+-name = "python-ldap"
+-license.text = "python-ldap"  # Replace with 'license' once Python 3.8 is dropped
+-dynamic = ["version"]
+-description = "Python modules for implementing LDAP clients"
+-authors = [
+-    {name = "python-ldap project", email = "python-ldap@python.org"},
+-]
+-readme = "README"
+-requires-python = ">=3.6"
+-keywords = ["ldap", "directory", "authentication"]
+-classifiers = [
+-    "Development Status :: 5 - Production/Stable",
+-    "Intended Audience :: Developers",
+-    "Intended Audience :: System Administrators",
+-    "Operating System :: OS Independent",
+-    "Operating System :: MacOS :: MacOS X",
+-    "Operating System :: Microsoft :: Windows",
+-    "Operating System :: POSIX",
+-    "Programming Language :: C",
+-    "Programming Language :: Python",
+-    "Programming Language :: Python :: 3",
+-    "Programming Language :: Python :: 3.6",
+-    "Programming Language :: Python :: 3.7",
+-    "Programming Language :: Python :: 3.8",
+-    "Programming Language :: Python :: 3.9",
+-    "Programming Language :: Python :: 3.10",
+-    "Programming Language :: Python :: 3.11",
+-    "Programming Language :: Python :: 3.12",
+-    "Programming Language :: Python :: 3.13",
+-    "Topic :: Database",
+-    "Topic :: Internet",
+-    "Topic :: Software Development :: Libraries :: Python Modules",
+-    "Topic :: System :: Systems Administration :: Authentication/Directory :: LDAP",
+-    "License :: OSI Approved :: Python Software Foundation License",
+-]
+-dependencies = [
+-    "pyasn1 >= 0.3.7",
+-    "pyasn1_modules >= 0.1.5",
+-]
+-
+-[project.urls]
+-Homepage = "https://www.python-ldap.org/"
+-Documentation = "https://python-ldap.readthedocs.io/"
+-Repository = "https://github.com/python-ldap/python-ldap"
+-Download = "https://pypi.org/project/python-ldap/"
+-Changelog = "https://github.com/python-ldap/python-ldap/blob/main/CHANGES"
+-
+-
+-
+-[tool.setuptools]
+-zip-safe = false
+-include-package-data = true
+-license-files = ["LICENCE", "LICENCE.MIT"]
+-# Explicitly list all Python modules
+-py-modules = ["ldapurl", "ldif"]
+-
+-[tool.setuptools.dynamic]
+-version = {attr = "ldap.pkginfo.__version__"}
+-
+-[tool.setuptools.packages.find]
+-where = ["Lib"]
+-
+-[tool.setuptools.package-dir]
+-"" = "Lib"
++[tool.black]
++line-length = 88
++target-version = ['py36', 'py37', 'py38']
+ 
+ [tool.isort]
+-line_length = 88
+-known_first_party = ["ldap", "_ldap", "ldapurl", "ldif", "slapdtest"]
+-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+-
+-[tool.coverage.run]
+-branch = true
+-source = [
+-    "ldap",
+-    "ldif",
+-    "ldapurl",
+-    "slapdtest",
+-]
+-
+-[tool.coverage.paths]
+-source = [
+-    "Lib/",
+-    ".tox/*/lib/python*/site-packages/",
+-]
+-
+-[tool.coverage.report]
+-ignore_errors = false
+-precision = 1
+-exclude_lines = [
+-    "pragma: no cover",
+-    "raise NotImplementedError",
+-    "if 0:",
+-    "if __name__ == .__main__.:",
+-    "if PY2",
+-    "if not PY2",
+-]
+-
+-[tool.coverage.html]
+-directory = "build/htmlcov"
+-title = "python-ldap coverage report"
++line_length=88
++known_first_party=['ldap', '_ldap', 'ldapurl', 'ldif', 'slapdtest']
++sections=['FUTURE', 'STDLIB', 'THIRDPARTY', 'FIRSTPARTY', 'LOCALFOLDER']
+diff --git a/setup.py b/setup.py
+index 9ad6996..ad9d93b 100644
+--- a/setup.py
++++ b/setup.py
+@@ -1,9 +1,7 @@
+ """
+-setup.py - C extension module configuration for python-ldap
++setup.py - Setup package with the help Python's DistUtils
+ 
+ See https://www.python-ldap.org/ for details.
+-This file handles only the C extension modules (_ldap) configuration,
+-while pyproject.toml handles all project metadata, dependencies, and other settings.
+ """
+ 
+ import sys,os
+@@ -56,8 +54,55 @@ if os.environ.get('WITH_GCOV'):
+   LDAP_CLASS.extra_link_args.append('-pg')
+   LDAP_CLASS.libs.append('gcov')
+ 
+-#-- C extension modules configuration only
++#-- Let distutils/setuptools do the rest
++name = 'python-ldap'
++
+ setup(
++  #-- Package description
++  name = name,
++  license=pkginfo.__license__,
++  version=pkginfo.__version__,
++  description = 'Python modules for implementing LDAP clients',
++  long_description = """python-ldap:
++  python-ldap provides an object-oriented API to access LDAP directory servers
++  from Python programs. Mainly it wraps the OpenLDAP 2.x libs for that purpose.
++  Additionally the package contains modules for other LDAP-related stuff
++  (e.g. processing LDIF, LDAPURLs, LDAPv3 schema, LDAPv3 extended operations
++  and controls, etc.).
++  """,
++  author = 'python-ldap project',
++  author_email = 'python-ldap@python.org',
++  url = 'https://www.python-ldap.org/',
++  download_url = 'https://pypi.org/project/python-ldap/',
++  classifiers = [
++    'Development Status :: 5 - Production/Stable',
++    'Intended Audience :: Developers',
++    'Intended Audience :: System Administrators',
++    'Operating System :: OS Independent',
++    'Operating System :: MacOS :: MacOS X',
++    'Operating System :: Microsoft :: Windows',
++    'Operating System :: POSIX',
++    'Programming Language :: C',
++
++    'Programming Language :: Python',
++    'Programming Language :: Python :: 3',
++    'Programming Language :: Python :: 3.6',
++    'Programming Language :: Python :: 3.7',
++    'Programming Language :: Python :: 3.8',
++    'Programming Language :: Python :: 3.9',
++    'Programming Language :: Python :: 3.10',
++    'Programming Language :: Python :: 3.11',
++    'Programming Language :: Python :: 3.12',
++    'Programming Language :: Python :: 3.13',
++    # Note: when updating Python versions, also change tox.ini and .github/workflows/*
++
++    'Topic :: Database',
++    'Topic :: Internet',
++    'Topic :: Software Development :: Libraries :: Python Modules',
++    'Topic :: System :: Systems Administration :: Authentication/Directory :: LDAP',
++    'License :: OSI Approved :: Python Software Foundation License',
++  ],
++  #-- C extension modules
+   ext_modules = [
+     Extension(
+       '_ldap',
+@@ -100,4 +145,28 @@ setup(
+         ]
+     ),
+   ],
++  #-- Python "stand alone" modules
++  py_modules = [
++    'ldapurl',
++    'ldif',
++
++  ],
++  packages = [
++    'ldap',
++    'ldap.controls',
++    'ldap.extop',
++    'ldap.schema',
++    'slapdtest',
++    'slapdtest.certs',
++  ],
++  package_dir = {'': 'Lib',},
++  data_files = LDAP_CLASS.extra_files,
++  include_package_data=True,
++  install_requires=[
++    'pyasn1 >= 0.3.7',
++    'pyasn1_modules >= 0.1.5',
++  ],
++  zip_safe=False,
++  python_requires='>=3.6',
++  test_suite = 'Tests',
+ )
+diff --git a/tox.ini b/tox.ini
+index 436fb8f..40a6bef 100644
+--- a/tox.ini
++++ b/tox.ini
+@@ -33,7 +33,6 @@ commands = {envpython} -bb -Werror \
+ setenv =
+     CFLAGS=-Wno-int-in-bool-context -Werror -std=c99
+ 
+-
+ [testenv:py3-nosasltls]
+ basepython = python3
+ # don't install, install dependencies manually
+-- 
+2.54.0
+

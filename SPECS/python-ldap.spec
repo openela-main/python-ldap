@@ -4,14 +4,15 @@
 %global openldap_version 2.4.45-4
 
 Name: python-ldap
-Version: 3.4.3
-Release: 2%{?dist}
+Version: 3.4.7
+Release: 1%{?dist}
 License: Python
 Summary: An object-oriented API to access LDAP directory servers
 URL: https://python-ldap.org/
-Source0: https://files.pythonhosted.org/packages/source/p/%{name}/%{name}-%{version}%{?prerelease}.tar.gz
+Source0: %{pypi_source python_ldap}
 
 Patch0001: 0001-Disable-openldap-servers-tests.patch
+Patch0002: 0001-Revert-Package-python-ldap-with-pyproject.toml-589.patch
 
 ### Build Dependencies ###
 BuildRequires: gcc
@@ -50,7 +51,7 @@ Provides:  python3-pyldap%{?_isa} = %{version}-%{release}
 
 
 %prep
-%autosetup -p1 -n %{name}-%{version}%{?prerelease}
+%autosetup -p1 -n python_ldap-%{version}%{?prerelease}
 # Fix interpreter
 find . -name '*.py' | xargs sed -i '1s|^#!/usr/bin/env python|#!%{__python3}|'
 
@@ -78,6 +79,14 @@ PYTHONPATH=%{buildroot}%{python3_sitearch} %{__python3} -m unittest discover -v 
 %{python3_sitearch}/python_ldap-%{version}%{?prerelease}-py%{python3_version}.egg-info/
 
 %changelog
+* Tue Jun 30 2026 Simon Pichugin <spichugi@redhat.com> - 3.4.7-1
+- New upstream release 3.4.7
+- Resolves: RHEL-183876
+
+* Fri Apr 24 2026 Simon Pichugin <spichugi@redhat.com> - 3.4.5-1
+- New upstream release 3.4.5
+- Resolves: RHEL-155663
+
 * Thu Jan 12 2023 Simon Pichugin <spichugi@redhat.com> - 3.4.3-2
 - Fix changelog date typo
   Related: rhbz#2158289
